@@ -6,7 +6,11 @@ import (
 	"testing"
 )
 
-func TestReconcile(t *testing.T) {
+func TestReconcileV1(t *testing.T) {
+	testReconcile(t, reconcileV1)
+}
+
+func testReconcile(t *testing.T, reconcile func(src *Peer, dst *Peer) error) {
 	pub1, priv1, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
 		t.Fatalf("P1 failed to generate key: %s", err.Error())
@@ -19,12 +23,12 @@ func TestReconcile(t *testing.T) {
 	}
 	p2 := NewPeer(pub2, priv2, NewMemStore())
 
-	patches := testPatches(p1.pub, p1.priv)
-	if err = p1.Integrate(patches); err != nil {
-		t.Fatalf("P1 failed to integrate init patches: %s", err.Error())
+	records := testRecords(p1.pub, p1.priv)
+	if err = p1.Integrate(records); err != nil {
+		t.Fatalf("P1 failed to integrate init records: %s", err.Error())
 	}
-	if err = p2.Integrate(patches); err != nil {
-		t.Fatalf("P2 failed to integrate init patches: %s", err.Error())
+	if err = p2.Integrate(records); err != nil {
+		t.Fatalf("P2 failed to integrate init records: %s", err.Error())
 	}
 	if _, err = p1.Commit([]byte("G")); err != nil {
 		t.Fatalf("P1 failed to commit 'G': %s", err.Error())
@@ -35,10 +39,10 @@ func TestReconcile(t *testing.T) {
 	if _, err = p2.Commit([]byte("I")); err != nil {
 		t.Fatalf("P2 failed to commit 'I': %s", err.Error())
 	}
-	if err = reconcileV1(p1, p2); err != nil {
+	if err = reconcile(p1, p2); err != nil {
 		t.Fatalf("Reconcile P1->P2 failed: %s", err.Error())
 	}
-	if err = reconcileV1(p2, p1); err != nil {
+	if err = reconcile(p2, p1); err != nil {
 		t.Fatalf("Reconcile P2->P1 failed: %s", err.Error())
 	}
 
@@ -72,13 +76,13 @@ func compareStores(s1 *MemStore, s2 *MemStore, t *testing.T) {
 func reconcileV1(src *Peer, dst *Peer) error {
 	heads := src.Announce()        // A sends its own most recent PIDs
 	missing := dst.NotFound(heads) // B filters out which of the A's head PIDs were unknown of it
-	for len(missing) > 0 {         // until all missing patches are found
-		patches := src.Request(missing) // send request to A asking for missing PIDs
-		err := dst.Integrate(patches)   // B tries to integrate A's patches
+	for len(missing) > 0 {         // until all missing records are found
+		records := src.Request(missing) // send request to A asking for missing PIDs
+		err := dst.Integrate(records)   // B tries to integrate A's records
 		if err != nil {
 			return err
 		}
-		missing = dst.MissingDeps() // B recalculates missing patches
+		missing = dst.MissingDeps() // B recalculates missing records
 	}
 	return nil
 }

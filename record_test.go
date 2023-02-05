@@ -8,15 +8,15 @@ import (
 	"testing"
 )
 
-func TestPatchReadWrite(t *testing.T) {
+func TestRecordReadWrite(t *testing.T) {
 	pub, priv, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
 
-	a := NewPatch(pub, priv, []ID{}, []byte("A"))
-	b := NewPatch(pub, priv, []ID{a.id}, []byte("B"))
-	c := NewPatch(pub, priv, []ID{a.id, b.id}, []byte("C"))
+	a := NewRecord(pub, priv, []ID{}, []byte("A"))
+	b := NewRecord(pub, priv, []ID{a.id}, []byte("B"))
+	c := NewRecord(pub, priv, []ID{a.id, b.id}, []byte("C"))
 
 	var buf bytes.Buffer
 	w := bufio.NewWriter(&buf)
@@ -28,7 +28,7 @@ func TestPatchReadWrite(t *testing.T) {
 	}
 
 	r := bufio.NewReader(&buf)
-	p, err := ReadPatch(r)
+	p, err := ReadRecord(r)
 	if err != nil {
 		t.Fatalf(err.Error())
 	}

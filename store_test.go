@@ -12,15 +12,15 @@ import (
 		A    \
 		 \ C - E - F
 */
-func testPatches(pub ed25519.PublicKey, priv ed25519.PrivateKey) []*Patch {
-	a := NewPatch(pub, priv, []ID{}, []byte("A"))
-	b := NewPatch(pub, priv, []ID{a.id}, []byte("B"))
-	c := NewPatch(pub, priv, []ID{a.id}, []byte("C"))
-	d := NewPatch(pub, priv, []ID{b.id}, []byte("D"))
-	e := NewPatch(pub, priv, []ID{b.id, c.id}, []byte("E"))
-	f := NewPatch(pub, priv, []ID{e.id}, []byte("F"))
+func testRecords(pub ed25519.PublicKey, priv ed25519.PrivateKey) []*Record {
+	a := NewRecord(pub, priv, []ID{}, []byte("A"))
+	b := NewRecord(pub, priv, []ID{a.id}, []byte("B"))
+	c := NewRecord(pub, priv, []ID{a.id}, []byte("C"))
+	d := NewRecord(pub, priv, []ID{b.id}, []byte("D"))
+	e := NewRecord(pub, priv, []ID{b.id, c.id}, []byte("E"))
+	f := NewRecord(pub, priv, []ID{e.id}, []byte("F"))
 
-	return []*Patch{
+	return []*Record{
 		a, b, c, d, e, f,
 	}
 }
@@ -31,16 +31,16 @@ func TestMemStoreCommitGet(t *testing.T) {
 		t.Fatalf(err.Error())
 	}
 	ms := NewMemStore()
-	patches := testPatches(pub, priv)
-	for _, p := range patches {
+	records := testRecords(pub, priv)
+	for _, p := range records {
 		if err := ms.Commit(p); err != nil {
 			t.Fatalf(err.Error())
 		}
 	}
-	for _, p := range patches {
+	for _, p := range records {
 		o := ms.Get(p.id)
 		if o != p {
-			t.Fatalf("commit/get patches don't match")
+			t.Fatalf("commit/get records don't match")
 		}
 	}
 }
@@ -51,11 +51,11 @@ func TestMemStoreCommitMissingDependency(t *testing.T) {
 		t.Fatalf(err.Error())
 	}
 	ms := NewMemStore()
-	patches := testPatches(pub, priv)
+	records := testRecords(pub, priv)
 	const Removed = 4
-	patches = append(patches[:Removed], patches[Removed+1:]...)
+	records = append(records[:Removed], records[Removed+1:]...)
 
-	for i, p := range patches {
+	for i, p := range records {
 		err := ms.Commit(p)
 		if i == Removed && err == DependencyNotFoundError {
 			break
@@ -71,8 +71,8 @@ func TestMemStorePagination(t *testing.T) {
 		t.Fatalf(err.Error())
 	}
 	ms := NewMemStore()
-	patches := testPatches(pub, priv)
-	for _, p := range patches {
+	records := testRecords(pub, priv)
+	for _, p := range records {
 		if err := ms.Commit(p); err != nil {
 			t.Fatalf(err.Error())
 		}
@@ -83,10 +83,10 @@ func TestMemStorePagination(t *testing.T) {
 	if len(res) != 2 {
 		t.Fatalf("returned result length doesn't match")
 	}
-	if res[0] != patches[3] {
+	if res[0] != records[3] {
 		t.Fatalf("returned first element of the page doesn't match")
 	}
-	if res[1] != patches[4] {
+	if res[1] != records[4] {
 		t.Fatalf("returned first element of the page doesn't match")
 	}
 
@@ -95,13 +95,13 @@ func TestMemStorePagination(t *testing.T) {
 	if len(res) != 3 {
 		t.Fatalf("returned result length doesn't match")
 	}
-	if res[0] != patches[0] {
+	if res[0] != records[0] {
 		t.Fatalf("returned first element of the page doesn't match")
 	}
-	if res[1] != patches[1] {
+	if res[1] != records[1] {
 		t.Fatalf("returned first element of the page doesn't match")
 	}
-	if res[2] != patches[2] {
+	if res[2] != records[2] {
 		t.Fatalf("returned first element of the page doesn't match")
 	}
 }
@@ -112,19 +112,19 @@ func TestMemStorePredecessors(t *testing.T) {
 		t.Fatalf(err.Error())
 	}
 	ms := NewMemStore()
-	patches := testPatches(pub, priv)
-	for _, p := range patches {
+	records := testRecords(pub, priv)
+	for _, p := range records {
 		if err := ms.Commit(p); err != nil {
 			t.Fatalf(err.Error())
 		}
 	}
-	heads := []ID{patches[4].id}
+	heads := []ID{records[4].id}
 	missing := ms.Predecessors(heads)
-	expect := []*Patch{
-		patches[4],
-		patches[1],
-		patches[2],
-		patches[0],
+	expect := []*Record{
+		records[4],
+		records[1],
+		records[2],
+		records[0],
 	}
 	for i, a := range missing {
 		b := expect[i]
@@ -140,20 +140,20 @@ func TestMemStorePredecessorsMultiHeads(t *testing.T) {
 		t.Fatalf(err.Error())
 	}
 	ms := NewMemStore()
-	patches := testPatches(pub, priv)
-	for _, p := range patches {
+	records := testRecords(pub, priv)
+	for _, p := range records {
 		if err := ms.Commit(p); err != nil {
 			t.Fatalf(err.Error())
 		}
 	}
-	heads := []ID{patches[4].id, patches[3].id}
+	heads := []ID{records[4].id, records[3].id}
 	missing := ms.Predecessors(heads)
-	expect := []*Patch{
-		patches[4],
-		patches[3],
-		patches[1],
-		patches[2],
-		patches[0],
+	expect := []*Record{
+		records[4],
+		records[3],
+		records[1],
+		records[2],
+		records[0],
 	}
 	for i, a := range missing {
 		b := expect[i]
@@ -169,17 +169,17 @@ func TestMemStoreMissing(t *testing.T) {
 		t.Fatalf(err.Error())
 	}
 	ms := NewMemStore()
-	patches := testPatches(pub, priv)
-	for _, p := range patches {
+	records := testRecords(pub, priv)
+	for _, p := range records {
 		if err := ms.Commit(p); err != nil {
 			t.Fatalf(err.Error())
 		}
 	}
-	heads := []ID{patches[4].id}
+	heads := []ID{records[4].id}
 	missing := ms.Missing(heads)
-	expect := []*Patch{
-		patches[3],
-		patches[5],
+	expect := []*Record{
+		records[3],
+		records[5],
 	}
 	for i, a := range missing {
 		b := expect[i]
@@ -195,18 +195,18 @@ func TestMemStoreMissingMultiHeads(t *testing.T) {
 		t.Fatalf(err.Error())
 	}
 	ms := NewMemStore()
-	patches := testPatches(pub, priv)
-	for _, p := range patches {
+	records := testRecords(pub, priv)
+	for _, p := range records {
 		if err := ms.Commit(p); err != nil {
 			t.Fatalf(err.Error())
 		}
 	}
-	heads := []ID{patches[1].id, patches[2].id}
+	heads := []ID{records[1].id, records[2].id}
 	missing := ms.Missing(heads)
-	expect := []*Patch{
-		patches[3],
-		patches[4],
-		patches[5],
+	expect := []*Record{
+		records[3],
+		records[4],
+		records[5],
 	}
 	for i, a := range missing {
 		b := expect[i]

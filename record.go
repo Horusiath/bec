@@ -11,22 +11,22 @@ import (
 	"io"
 )
 
-// ID is a unique Patch identifier. Generated as a consistent hash of that Patch contents.
+// ID is a unique Record identifier. Generated as a consistent hash of that Record contents.
 type ID = []byte
 
-// AuthorId is a unique identifier of an author who produced given Patch.
+// AuthorId is a unique identifier of an author who produced given Record.
 type AuthorId = ed25519.PublicKey
 
-type Patch struct {
-	id     ID       // globally unique content addressed SHA256 hash of current Patch
-	author AuthorId // creator of current Patch
-	sign   []byte   // signature used by an author used for Patch verification
-	deps   []ID     // dependencies: hashes of direct predecessor patches of this Patch
+type Record struct {
+	id     ID       // globally unique content addressed SHA256 hash of current Record
+	author AuthorId // creator of current Record
+	sign   []byte   // signature used by an author used for Record verification
+	deps   []ID     // dependencies: hashes of direct predecessors of this Record
 	data   []byte   // user data
 }
 
-func NewPatch(pub ed25519.PublicKey, priv ed25519.PrivateKey, deps []ID, data []byte) *Patch {
-	p := &Patch{
+func NewRecord(pub ed25519.PublicKey, priv ed25519.PrivateKey, deps []ID, data []byte) *Record {
+	p := &Record{
 		data:   data,
 		deps:   deps,
 		author: pub,
@@ -36,64 +36,64 @@ func NewPatch(pub ed25519.PublicKey, priv ed25519.PrivateKey, deps []ID, data []
 	return p
 }
 
-func (p *Patch) Verify() error {
-	if bytes.Compare(p.hash(), p.id) != 0 {
-		return fmt.Errorf("patch hash and id don't match: %s", hex.EncodeToString(p.id))
+func (r *Record) Verify() error {
+	if bytes.Compare(r.hash(), r.id) != 0 {
+		return fmt.Errorf("record hash and id don't match: %s", hex.EncodeToString(r.id))
 	}
-	if !ed25519.Verify(p.author, p.data, p.sign) {
-		return fmt.Errorf("patch signature verficiation failed: %s", hex.EncodeToString(p.id))
+	if !ed25519.Verify(r.author, r.data, r.sign) {
+		return fmt.Errorf("record signature verficiation failed: %s", hex.EncodeToString(r.id))
 	}
 	return nil
 }
 
-// Returns a content addressable hash of a given Patch.
-func (p *Patch) hash() ID {
+// Returns a content addressable hash of a given Record.
+func (r *Record) hash() ID {
 	h := sha256.New()
-	for _, d := range p.deps {
+	for _, d := range r.deps {
 		h.Write(d)
 	}
-	h.Write(p.data)
-	h.Write(p.author)
+	h.Write(r.data)
+	h.Write(r.author)
 	return h.Sum(nil)
 }
 
-func (p *Patch) Write(w io.Writer) error {
+func (r *Record) Write(w io.Writer) error {
 	var inlined [5]byte // inline buffer for variable length integers
 	buf := inlined[:]
 
-	n, err := w.Write(p.author)
+	n, err := w.Write(r.author)
 	if err != nil {
 		return err
 	}
-	n, err = w.Write(p.sign)
+	n, err = w.Write(r.sign)
 	if err != nil {
 		return err
 	}
-	n = binary.PutUvarint(buf, uint64(len(p.deps)))
+	n = binary.PutUvarint(buf, uint64(len(r.deps)))
 	n, err = w.Write(buf[:n])
 	if err != nil {
 		return err
 	}
-	for _, d := range p.deps {
+	for _, d := range r.deps {
 		n, err = w.Write(d)
 		if err != nil {
 			return err
 		}
 	}
 
-	n = binary.PutUvarint(buf, uint64(len(p.data)))
+	n = binary.PutUvarint(buf, uint64(len(r.data)))
 	n, err = w.Write(buf[:n])
 	if err != nil {
 		return err
 	}
-	n, err = w.Write(p.data)
+	n, err = w.Write(r.data)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func ReadPatch(r *bufio.Reader) (*Patch, error) {
+func ReadRecord(r *bufio.Reader) (*Record, error) {
 	var inlined [ed25519.SignatureSize]byte
 	buf := inlined[:]
 	n, err := r.Read(buf[:ed25519.PublicKeySize])
@@ -131,7 +131,7 @@ func ReadPatch(r *bufio.Reader) (*Patch, error) {
 	if err != nil || n != int(dl) {
 		return nil, err
 	}
-	p := &Patch{
+	p := &Record{
 		id:     nil,
 		author: author,
 		sign:   sig,

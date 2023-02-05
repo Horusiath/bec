@@ -6,30 +6,30 @@ import (
 )
 
 var (
-	// AlreadyCommittedError happens when duplicate Patch has been sent to Store.Commit
-	AlreadyCommittedError = fmt.Errorf("provided patch has been already comitted")
+	// AlreadyCommittedError happens when duplicate Record has been sent to Store.Commit
+	AlreadyCommittedError = fmt.Errorf("provided record has been already comitted")
 
-	// DependencyNotFoundError happens when Patch was committed to the store which was missing one or more of its dependencies.
-	DependencyNotFoundError = fmt.Errorf("parent patch not found")
+	// DependencyNotFoundError happens when Record was committed to the store which was missing one or more of its dependencies.
+	DependencyNotFoundError = fmt.Errorf("parent record not found")
 )
 
 type MemStore struct {
-	log        []*Patch       // ever-growing log of patches, every new Commit is appended to the end and never deleted
+	log        []*Record      // ever-growing log of records, every new Commit is appended to the end and never deleted
 	index      map[string]int // index of patch.id to its location in the log
-	childrenOf [][]int        // a list from parent Commit to its children descendants, by their log index position. Indexes of childrenOf match indexes of log
+	childrenOf [][]int        // a list from parent Record to its children descendants, by their log index position. Indexes of childrenOf match indexes of log
 }
 
 // NewMemStore returns a new empty MemStore.
 func NewMemStore() *MemStore {
 	return &MemStore{
-		log:        []*Patch{},
+		log:        []*Record{},
 		index:      make(map[string]int),
 		childrenOf: [][]int{},
 	}
 }
 
-// Get returns a Patch identified by provided id. Returns nil if no Patch with given id was found.
-func (ms *MemStore) Get(id ID) *Patch {
+// Get returns a Record identified by provided id. Returns nil if no Record with given id was found.
+func (ms *MemStore) Get(id ID) *Record {
 	key := hex.EncodeToString(id)
 	i, found := ms.index[key]
 	if !found {
@@ -38,10 +38,10 @@ func (ms *MemStore) Get(id ID) *Patch {
 	return ms.log[i]
 }
 
-// GetMany returns a slice of patches matching provided sequence of ids.
+// GetMany returns a slice of records matching provided sequence of ids.
 // If a ID from provided input has not been found, it will be omitted from the result slice.
-func (ms *MemStore) GetMany(ids []ID) []*Patch {
-	res := make([]*Patch, 0, len(ids))
+func (ms *MemStore) GetMany(ids []ID) []*Record {
+	res := make([]*Record, 0, len(ids))
 	for _, id := range ids {
 		key := hex.EncodeToString(id)
 		i := ms.index[key]
@@ -50,8 +50,8 @@ func (ms *MemStore) GetMany(ids []ID) []*Patch {
 	return res
 }
 
-// LatestN is a paging function, which returns the `take` latest integrated patches, skiping the `skip` amount of them.
-func (ms *MemStore) LatestN(skip int, take int) []*Patch {
+// LatestN is a paging function, which returns the `take` latest integrated records, skiping the `skip` amount of them.
+func (ms *MemStore) LatestN(skip int, take int) []*Record {
 	limit := len(ms.log)
 	start := limit - skip - take
 	if start < 0 {
@@ -65,12 +65,12 @@ func (ms *MemStore) LatestN(skip int, take int) []*Patch {
 	return res
 }
 
-// Heads recovers the most recent patches that can serve as anchors for newly created patches.
+// Heads recovers the most recent records that can serve as anchors for newly created records.
 func (ms *MemStore) Heads() []ID {
 	var res []ID
 	for i, children := range ms.childrenOf {
 		if children == nil || len(children) == 0 {
-			// this Patch has no children => it must be a head
+			// this Record has no children => it must be a head
 			res = append(res, ms.log[i].id)
 		}
 	}
@@ -101,9 +101,9 @@ func pop(q *[]int) (int, bool) {
 	}
 }
 
-// Traverses over the patches of heads and their predecessors, executing given function f with patch
-// index location in MemStore.log and patch itself. Returns a Bitmap which is a filter describing all visited patches.
-func (ms *MemStore) predecessorsF(heads []ID, f func(int, *Patch)) Bitmap {
+// Traverses over the records of heads and their predecessors, executing given function f with patch
+// index location in MemStore.log and patch itself. Returns a Bitmap which is a filter describing all visited records.
+func (ms *MemStore) predecessorsF(heads []ID, f func(int, *Record)) Bitmap {
 	q := ms.indexes(heads)
 	visited := NewBitmap(len(ms.log))
 	for {
@@ -122,20 +122,20 @@ func (ms *MemStore) predecessorsF(heads []ID, f func(int, *Patch)) Bitmap {
 	return visited
 }
 
-func (ms *MemStore) Predecessors(heads []ID) []*Patch {
-	var res []*Patch
-	ms.predecessorsF(heads, func(i int, p *Patch) {
+func (ms *MemStore) Predecessors(heads []ID) []*Record {
+	var res []*Record
+	ms.predecessorsF(heads, func(i int, p *Record) {
 		res = append(res, p)
 	})
 	return res
 }
 
-// Missing returns a list of patches that are successors or concurrent to given heads.
-func (ms *MemStore) Missing(heads []ID) []*Patch {
-	v := ms.predecessorsF(heads, func(i int, patch *Patch) {
+// Missing returns a list of records that are successors or concurrent to given heads.
+func (ms *MemStore) Missing(heads []ID) []*Record {
+	v := ms.predecessorsF(heads, func(i int, r *Record) {
 		/* do nothing */
 	})
-	var res []*Patch
+	var res []*Record
 	for i, p := range ms.log {
 		if !v.Get(i) {
 			res = append(res, p)
@@ -144,7 +144,7 @@ func (ms *MemStore) Missing(heads []ID) []*Patch {
 	return res
 }
 
-func (ms *MemStore) Commit(p *Patch) error {
+func (ms *MemStore) Commit(p *Record) error {
 	if err := p.Verify(); err != nil {
 		return err // invalid patch trying to be committed
 	}
@@ -176,18 +176,18 @@ func (ms *MemStore) Contains(id ID) bool {
 }
 
 type Stash struct {
-	log   []*Patch
+	log   []*Record
 	index map[string]int
 }
 
 func NewStash() *Stash {
 	return &Stash{
-		log:   []*Patch{},
+		log:   []*Record{},
 		index: make(map[string]int),
 	}
 }
 
-func (s *Stash) Add(p *Patch) {
+func (s *Stash) Add(p *Record) {
 	id := hex.EncodeToString(p.id)
 	if _, found := s.index[id]; found {
 		return
@@ -203,14 +203,14 @@ func (s *Stash) Contains(id ID) bool {
 }
 
 // UnStash returns all logs and clears up current Stash.
-func (s *Stash) UnStash() []*Patch {
+func (s *Stash) UnStash() []*Record {
 	res := s.log
 	// reverse the log order
 	for i := 0; i < len(res)/2; i++ {
 		j := len(res) - 1 - i
 		res[i], res[j] = res[j], res[i]
 	}
-	s.log = []*Patch{}
+	s.log = []*Record{}
 	s.index = make(map[string]int)
 	return res
 }

@@ -13,10 +13,10 @@ const (
 type Peer struct {
 	pub         ed25519.PublicKey   // Peer's public key, equals to Author
 	priv        ed25519.PrivateKey  // Peer's private key, used for verification
-	heads       []ID                // the "youngest" (logically) patches. All newly created patches on this peer will refer to heads as their deps.
-	store       *MemStore           // Store where patches are stored
-	stash       *Stash              // Stash used as a temporary container for patches which are being resolved
-	missingDeps map[string]struct{} // "known" missing deps preventing patches from stash to be integrated into store
+	heads       []ID                // the "youngest" (logically) records. All newly created records on this peer will refer to heads as their deps.
+	store       *MemStore           // Store where records are stored
+	stash       *Stash              // Stash used as a temporary container for records which are being resolved
+	missingDeps map[string]struct{} // "known" missing deps preventing records from stash to be integrated into store
 }
 
 // NewPeer returns a peer instance representing current peer.
@@ -39,8 +39,8 @@ func (p *Peer) Heads() []ID {
 	return p.heads
 }
 
-func (p *Peer) Commit(data []byte) (*Patch, error) {
-	c := NewPatch(p.pub, p.priv, p.heads, data)
+func (p *Peer) Commit(data []byte) (*Record, error) {
+	c := NewRecord(p.pub, p.priv, p.heads, data)
 	err := p.store.Commit(c)
 	if err != nil {
 		return nil, err
@@ -51,21 +51,21 @@ func (p *Peer) Commit(data []byte) (*Patch, error) {
 	return c, err
 }
 
-// Integrate patches into current peer. Patches are expected to be listed in their causal order.
-// If Patch has some unsatisfied dependencies, it will be stashed instead.
-func (p *Peer) Integrate(patches []*Patch) error {
+// Integrate records into current peer. Patches are expected to be listed in their causal order.
+// If Record has some unsatisfied dependencies, it will be stashed instead.
+func (p *Peer) Integrate(rs []*Record) error {
 	changed := false
-	for _, u := range patches {
-		if err := u.Verify(); err != nil {
+	for _, r := range rs {
+		if err := r.Verify(); err != nil {
 			return err // remote patch was forged
 		}
-		if p.store.Contains(u.id) || p.stash.Contains(u.id) {
+		if p.store.Contains(r.id) || p.stash.Contains(r.id) {
 			continue // already seen in either log or stash
 		}
 
 		// check if dependencies are satisfied
 		var missingDeps []ID
-		for _, dep := range u.deps {
+		for _, dep := range r.deps {
 			if !p.store.Contains(dep) {
 				if !p.stash.Contains(dep) {
 					missingDeps = append(missingDeps, dep)
@@ -74,30 +74,30 @@ func (p *Peer) Integrate(patches []*Patch) error {
 		}
 
 		if len(missingDeps) > 0 {
-			p.stash.Add(u)
+			p.stash.Add(r)
 			for _, d := range missingDeps {
 				p.missingDeps[hex.EncodeToString(d)] = struct{}{}
 			}
 		} else {
-			if err := p.store.Commit(u); err != nil {
+			if err := p.store.Commit(r); err != nil {
 				return err
 			}
-			delete(p.missingDeps, hex.EncodeToString(u.id))
+			delete(p.missingDeps, hex.EncodeToString(r.id))
 			changed = true
 		}
 	}
 	if changed {
 		p.heads = p.store.Heads()
 		// try to reintegrate stashed elements
-		patches = p.stash.UnStash()
-		if len(patches) != 0 {
-			return p.Integrate(patches) // can we hope for tail recursion here?
+		rs = p.stash.UnStash()
+		if len(rs) != 0 {
+			return p.Integrate(rs) // can we hope for tail recursion here?
 		}
 	}
 	return nil
 }
 
-// MissingDeps returns a list of known missing patches that prevent applying patches from stash to be put into the store.
+// MissingDeps returns a list of known missing records that prevent applying records from stash to be put into the store.
 func (p *Peer) MissingDeps() []ID {
 	var res []ID
 	for dep := range p.missingDeps {
@@ -114,7 +114,7 @@ func (p *Peer) Announce() []ID {
 	return p.heads
 }
 
-func (p *Peer) Request(ids []ID) []*Patch {
+func (p *Peer) Request(ids []ID) []*Record {
 	return p.store.GetMany(ids)
 }
 
@@ -132,7 +132,7 @@ func (p *Peer) NotFound(ids []ID) []ID {
 const (
 	MsgAnnounce = iota
 	MsgRequest
-	MsgPatches
+	MsgRecords
 )
 
 type PeerController struct {
@@ -160,11 +160,11 @@ func (c *PeerController) Process() error {
 				// sender <- MsgRequest(ids)
 			case MsgRequest:
 				// ids []ID := parse(msg)
-				// patches := peer.store.GetMany(pids)
-				// sender <- MsgPatches(patches)
-			case MsgPatches:
-				// patches []*Patch := parse(msg)
-				// peer.Integrate(patches)
+				// records := peer.store.GetMany(pids)
+				// sender <- MsgRecords(records)
+			case MsgRecords:
+				// records []*Record := parse(msg)
+				// peer.Integrate(records)
 				// ids := peer.MissingDeps()
 				// if len(ids) > 0:
 				//     sender <- MsgRequest(ids)
