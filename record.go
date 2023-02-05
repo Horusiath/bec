@@ -1,14 +1,11 @@
 package bec
 
 import (
-	"bufio"
 	"bytes"
 	"crypto/ed25519"
 	"crypto/sha256"
-	"encoding/binary"
 	"encoding/hex"
 	"fmt"
-	"io"
 )
 
 // ID is a unique Record identifier. Generated as a consistent hash of that Record contents.
@@ -55,92 +52,4 @@ func (r *Record) hash() ID {
 	h.Write(r.data)
 	h.Write(r.author)
 	return h.Sum(nil)
-}
-
-func (r *Record) Write(w io.Writer) error {
-	var inlined [5]byte // inline buffer for variable length integers
-	buf := inlined[:]
-
-	n, err := w.Write(r.author)
-	if err != nil {
-		return err
-	}
-	n, err = w.Write(r.sign)
-	if err != nil {
-		return err
-	}
-	n = binary.PutUvarint(buf, uint64(len(r.deps)))
-	n, err = w.Write(buf[:n])
-	if err != nil {
-		return err
-	}
-	for _, d := range r.deps {
-		n, err = w.Write(d)
-		if err != nil {
-			return err
-		}
-	}
-
-	n = binary.PutUvarint(buf, uint64(len(r.data)))
-	n, err = w.Write(buf[:n])
-	if err != nil {
-		return err
-	}
-	n, err = w.Write(r.data)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func ReadRecord(r *bufio.Reader) (*Record, error) {
-	var inlined [ed25519.SignatureSize]byte
-	buf := inlined[:]
-	n, err := r.Read(buf[:ed25519.PublicKeySize])
-	if err != nil || n != ed25519.PublicKeySize {
-		return nil, err
-	}
-	var author []byte
-	author = append(author, buf[:ed25519.PublicKeySize]...)
-	n, err = r.Read(buf[:ed25519.SignatureSize])
-	if err != nil || n != ed25519.SignatureSize {
-		return nil, err
-	}
-	var sig []byte
-	sig = append(sig, buf[:ed25519.SignatureSize]...)
-	dl, err := binary.ReadUvarint(r)
-	if err != nil {
-		return nil, err
-	}
-	deps := make([]ID, int(dl), int(dl))
-	for i := 0; i < int(dl); i++ {
-		n, err = r.Read(buf[:ed25519.PublicKeySize])
-		if err != nil || n != ed25519.PublicKeySize {
-			return nil, err
-		}
-		var parent ID
-		parent = append(parent, buf[:ed25519.PublicKeySize]...)
-		deps[i] = parent
-	}
-	dl, err = binary.ReadUvarint(r)
-	if err != nil {
-		return nil, err
-	}
-	data := make([]byte, int(dl), int(dl))
-	n, err = r.Read(data)
-	if err != nil || n != int(dl) {
-		return nil, err
-	}
-	p := &Record{
-		id:     nil,
-		author: author,
-		sign:   sig,
-		deps:   deps,
-		data:   data,
-	}
-	p.id = p.hash() // hash was not serialized, we can infer it from content
-	if err = p.Verify(); err != nil {
-		return nil, err
-	}
-	return p, nil
 }
