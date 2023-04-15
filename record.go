@@ -16,28 +16,19 @@ func NewID(b []byte) ID {
 	return id
 }
 
-// AuthorId is a unique identifier of an author who produced given Record.
-type AuthorId = [ed25519.PublicKeySize]byte
-
-func NewAuthorId(pub ed25519.PublicKey) AuthorId {
-	var res AuthorId
-	copy(res[:], pub)
-	return res
-}
-
 type Record struct {
-	id     ID       // globally unique content addressed SHA256 hash of current Record
-	author AuthorId // creator of current Record
-	sign   []byte   // signature used by an author used for Record verification
-	deps   []ID     // dependencies: hashes of direct predecessors of this Record
-	data   []byte   // user data
+	id     ID     // globally unique content addressed SHA256 hash of current Record
+	author PeerId // creator of current Record
+	sign   []byte // signature used by an author used for Record verification
+	deps   []ID   // dependencies: hashes of direct predecessors of this Record
+	data   []byte // user data
 }
 
 func NewRecord(pub ed25519.PublicKey, priv ed25519.PrivateKey, deps []ID, data []byte) *Record {
 	p := &Record{
 		data:   data,
 		deps:   deps,
-		author: NewAuthorId(pub),
+		author: NewPeerId(pub),
 	}
 	p.id = p.hash()
 	p.sign = ed25519.Sign(priv, p.data) // could we just sign p.id? It's probably smaller and unique as well.

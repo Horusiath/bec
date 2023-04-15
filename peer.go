@@ -9,17 +9,26 @@ const (
 	BloomHashes       = 7
 )
 
+// PeerId is a unique identifier of an author who produced given Record.
+type PeerId = [ed25519.PublicKeySize]byte
+
+func NewPeerId(pub ed25519.PublicKey) PeerId {
+	var res PeerId
+	copy(res[:], pub)
+	return res
+}
+
 type Peer struct {
 	pub         ed25519.PublicKey  // Peer's public key, equals to Author
 	priv        ed25519.PrivateKey // Peer's private key, used for verification
 	heads       []ID               // the "youngest" (logically) records. All newly created records on this peer will refer to heads as their deps.
-	store       *MemStore          // Store where records are stored
+	store       *POLog             // Store where records are stored
 	stash       *Stash             // Stash used as a temporary container for records which are being resolved
 	missingDeps map[ID]struct{}    // "known" missing deps preventing records from stash to be integrated into store
 }
 
 // NewPeer returns a peer instance representing current peer.
-func NewPeer(pub ed25519.PublicKey, priv ed25519.PrivateKey, store *MemStore) *Peer {
+func NewPeer(pub ed25519.PublicKey, priv ed25519.PrivateKey, store *POLog) *Peer {
 	return &Peer{
 		pub:         pub,
 		priv:        priv,
@@ -30,8 +39,8 @@ func NewPeer(pub ed25519.PublicKey, priv ed25519.PrivateKey, store *MemStore) *P
 	}
 }
 
-func (p *Peer) Author() AuthorId {
-	return NewAuthorId(p.pub)
+func (p *Peer) Author() PeerId {
+	return NewPeerId(p.pub)
 }
 
 func (p *Peer) Heads() []ID {
@@ -40,7 +49,7 @@ func (p *Peer) Heads() []ID {
 
 func (p *Peer) Commit(data []byte) (*Record, error) {
 	c := NewRecord(p.pub, p.priv, p.heads, data)
-	err := p.store.Commit(c)
+	err := p.store.Append(c)
 	if err != nil {
 		return nil, err
 	}
@@ -59,7 +68,7 @@ func (p *Peer) Integrate(rs []*Record) error {
 			return err // remote patch was forged
 		}
 		if p.store.Contains(r.id) || p.stash.Contains(r.id) {
-			continue // already seen in either log or stash
+			continue // already seen in either records or stash
 		}
 
 		// check if dependencies are satisfied
@@ -78,7 +87,7 @@ func (p *Peer) Integrate(rs []*Record) error {
 				p.missingDeps[dep] = struct{}{}
 			}
 		} else {
-			if err := p.store.Commit(r); err != nil {
+			if err := p.store.Append(r); err != nil {
 				return err
 			}
 			delete(p.missingDeps, r.id)
@@ -128,12 +137,12 @@ func (p *Peer) NotFound(ids []ID) []ID {
 }
 
 // Grant moderation permission over a collection with given name to a provided mod.
-func (p *Peer) Grant(name string, mod AuthorId) error {
+func (p *Peer) Grant(name string, mod PeerId) error {
 	panic("todo")
 }
 
 // Revoke moderation permission over a collection with given name from a provided mod.
-func (p *Peer) Revoke(name string, mod AuthorId) error {
+func (p *Peer) Revoke(name string, mod PeerId) error {
 	panic("todo")
 }
 

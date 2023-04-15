@@ -15,13 +15,13 @@ func testReconcile(t *testing.T, reconcile func(src *Peer, dst *Peer) error) {
 	if err != nil {
 		t.Fatalf("P1 failed to generate key: %s", err.Error())
 	}
-	p1 := NewPeer(pub1, priv1, NewMemStore())
+	p1 := NewPeer(pub1, priv1, NewPOLog())
 
 	pub2, priv2, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
 		t.Fatalf("P2 failed to generate key: %s", err.Error())
 	}
-	p2 := NewPeer(pub2, priv2, NewMemStore())
+	p2 := NewPeer(pub2, priv2, NewPOLog())
 
 	records := testRecords(p1.pub, p1.priv)
 	if err = p1.Integrate(records); err != nil {
@@ -49,7 +49,7 @@ func testReconcile(t *testing.T, reconcile func(src *Peer, dst *Peer) error) {
 	compareStores(p1.store, p2.store, t)
 }
 
-func compareStores(s1 *MemStore, s2 *MemStore, t *testing.T) {
+func compareStores(s1 *POLog, s2 *POLog, t *testing.T) {
 	k1 := make(map[ID]struct{})
 	for k := range s1.index {
 		k1[k] = struct{}{}

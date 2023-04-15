@@ -25,15 +25,15 @@ func testRecords(pub ed25519.PublicKey, priv ed25519.PrivateKey) []*Record {
 	}
 }
 
-func TestMemStoreCommitGet(t *testing.T) {
+func TestPOLogCommitGet(t *testing.T) {
 	pub, priv, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
-	ms := NewMemStore()
+	ms := NewPOLog()
 	records := testRecords(pub, priv)
 	for _, p := range records {
-		if err := ms.Commit(p); err != nil {
+		if err := ms.Append(p); err != nil {
 			t.Fatalf(err.Error())
 		}
 	}
@@ -45,18 +45,18 @@ func TestMemStoreCommitGet(t *testing.T) {
 	}
 }
 
-func TestMemStoreCommitMissingDependency(t *testing.T) {
+func TestPOLogCommitMissingDependency(t *testing.T) {
 	pub, priv, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
-	ms := NewMemStore()
+	ms := NewPOLog()
 	records := testRecords(pub, priv)
 	const Removed = 4
 	records = append(records[:Removed], records[Removed+1:]...)
 
 	for i, p := range records {
-		err := ms.Commit(p)
+		err := ms.Append(p)
 		if i == Removed && err == DependencyNotFoundError {
 			break
 		} else if err != nil {
@@ -65,15 +65,15 @@ func TestMemStoreCommitMissingDependency(t *testing.T) {
 	}
 }
 
-func TestMemStorePagination(t *testing.T) {
+func TestPOLogPagination(t *testing.T) {
 	pub, priv, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
-	ms := NewMemStore()
+	ms := NewPOLog()
 	records := testRecords(pub, priv)
 	for _, p := range records {
-		if err := ms.Commit(p); err != nil {
+		if err := ms.Append(p); err != nil {
 			t.Fatalf(err.Error())
 		}
 	}
@@ -106,15 +106,15 @@ func TestMemStorePagination(t *testing.T) {
 	}
 }
 
-func TestMemStorePredecessors(t *testing.T) {
+func TestPOLogPredecessors(t *testing.T) {
 	pub, priv, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
-	ms := NewMemStore()
+	ms := NewPOLog()
 	records := testRecords(pub, priv)
 	for _, p := range records {
-		if err := ms.Commit(p); err != nil {
+		if err := ms.Append(p); err != nil {
 			t.Fatalf(err.Error())
 		}
 	}
@@ -134,15 +134,15 @@ func TestMemStorePredecessors(t *testing.T) {
 	}
 }
 
-func TestMemStorePredecessorsMultiHeads(t *testing.T) {
+func TestPOLogPredecessorsMultiHeads(t *testing.T) {
 	pub, priv, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
-	ms := NewMemStore()
+	ms := NewPOLog()
 	records := testRecords(pub, priv)
 	for _, p := range records {
-		if err := ms.Commit(p); err != nil {
+		if err := ms.Append(p); err != nil {
 			t.Fatalf(err.Error())
 		}
 	}
@@ -163,15 +163,15 @@ func TestMemStorePredecessorsMultiHeads(t *testing.T) {
 	}
 }
 
-func TestMemStoreMissing(t *testing.T) {
+func TestPOLogMissing(t *testing.T) {
 	pub, priv, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
-	ms := NewMemStore()
+	ms := NewPOLog()
 	records := testRecords(pub, priv)
 	for _, p := range records {
-		if err := ms.Commit(p); err != nil {
+		if err := ms.Append(p); err != nil {
 			t.Fatalf(err.Error())
 		}
 	}
@@ -189,15 +189,15 @@ func TestMemStoreMissing(t *testing.T) {
 	}
 }
 
-func TestMemStoreMissingMultiHeads(t *testing.T) {
+func TestPOLogMissingMultiHeads(t *testing.T) {
 	pub, priv, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
-	ms := NewMemStore()
+	ms := NewPOLog()
 	records := testRecords(pub, priv)
 	for _, p := range records {
-		if err := ms.Commit(p); err != nil {
+		if err := ms.Append(p); err != nil {
 			t.Fatalf(err.Error())
 		}
 	}

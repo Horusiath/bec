@@ -36,20 +36,16 @@ func (r *Record) Write(w io.Writer) error {
 }
 
 func ReadRecord(r *bufio.Reader) (*Record, error) {
-	var inlined [ed25519.SignatureSize]byte
-	buf := inlined[:]
-	n, err := r.Read(buf[:ed25519.PublicKeySize])
+	var author PeerId
+	n, err := r.Read(author[:])
 	if err != nil || n != ed25519.PublicKeySize {
 		return nil, err
 	}
-	var author AuthorId
-	copy(author[:], buf[:ed25519.PublicKeySize])
-	n, err = r.Read(buf[:ed25519.SignatureSize])
+	var sig [ed25519.SignatureSize]byte
+	n, err = r.Read(sig[:])
 	if err != nil || n != ed25519.SignatureSize {
 		return nil, err
 	}
-	var sig []byte
-	sig = append(sig, buf[:ed25519.SignatureSize]...)
 	deps, err := ReadIDs(r)
 	if err != nil {
 		return nil, err
@@ -65,7 +61,7 @@ func ReadRecord(r *bufio.Reader) (*Record, error) {
 	}
 	p := &Record{
 		author: author,
-		sign:   sig,
+		sign:   sig[:],
 		deps:   deps,
 		data:   data,
 	}
@@ -138,11 +134,11 @@ func ReadIDs(r *bufio.Reader) ([]ID, error) {
 	}
 	res := make([]ID, int(n), int(n))
 	for i := 0; i < int(n); i++ {
-		read, err := r.Read(buf[:ed25519.PublicKeySize])
+		read, err := r.Read(buf)
 		if err != nil || read != ed25519.PublicKeySize {
 			return nil, err
 		}
-		copy(res[i][:], buf[:ed25519.PublicKeySize])
+		res[i] = inlined
 	}
 
 	return res, nil
