@@ -1,7 +1,6 @@
 package bec
 
 import (
-	"encoding/hex"
 	"fmt"
 )
 
@@ -14,24 +13,23 @@ var (
 )
 
 type MemStore struct {
-	log        []*Record      // ever-growing log of records, every new Commit is appended to the end and never deleted
-	index      map[string]int // index of patch.id to its location in the log
-	childrenOf [][]int        // a list from parent Record to its children descendants, by their log index position. Indexes of childrenOf match indexes of log
+	log        []*Record  // ever-growing log of records, every new Commit is appended to the end and never deleted
+	index      map[ID]int // index of patch.id to its location in the log
+	childrenOf [][]int    // a list from parent Record to its children descendants, by their log index position. Indexes of childrenOf match indexes of log
 }
 
 // NewMemStore returns a new empty MemStore.
 func NewMemStore() *MemStore {
 	return &MemStore{
 		log:        []*Record{},
-		index:      make(map[string]int),
+		index:      make(map[ID]int),
 		childrenOf: [][]int{},
 	}
 }
 
 // Get returns a Record identified by provided id. Returns nil if no Record with given id was found.
 func (ms *MemStore) Get(id ID) *Record {
-	key := hex.EncodeToString(id)
-	i, found := ms.index[key]
+	i, found := ms.index[id]
 	if !found {
 		return nil
 	}
@@ -43,8 +41,7 @@ func (ms *MemStore) Get(id ID) *Record {
 func (ms *MemStore) GetMany(ids []ID) []*Record {
 	res := make([]*Record, 0, len(ids))
 	for _, id := range ids {
-		key := hex.EncodeToString(id)
-		i := ms.index[key]
+		i := ms.index[id]
 		res = append(res, ms.log[i])
 	}
 	return res
@@ -81,8 +78,7 @@ func (ms *MemStore) Heads() []ID {
 func (ms *MemStore) indexes(heads []ID) []int {
 	is := make([]int, 0, len(heads))
 	for _, h := range heads {
-		k := hex.EncodeToString(h)
-		if i, found := ms.index[k]; found {
+		if i, found := ms.index[h]; found {
 			is = append(is, i)
 		}
 	}
@@ -148,57 +144,53 @@ func (ms *MemStore) Commit(p *Record) error {
 	if err := p.Verify(); err != nil {
 		return err // invalid patch trying to be committed
 	}
-	cid := hex.EncodeToString(p.id)
-	if _, found := ms.index[cid]; found {
+	if _, found := ms.index[p.id]; found {
 		return AlreadyCommittedError
 	}
-	for _, d := range p.deps {
-		k := hex.EncodeToString(d)
-		if _, found := ms.index[k]; !found {
+	for _, dep := range p.deps {
+		if _, found := ms.index[dep]; !found {
 			return DependencyNotFoundError
 		}
 	}
 	i := len(ms.log)
 	ms.log = append(ms.log, p)
 	ms.childrenOf = append(ms.childrenOf, nil)
-	ms.index[cid] = i
-	for _, d := range p.deps {
-		k := hex.EncodeToString(d)
-		pi := ms.index[k]
+	ms.index[p.id] = i
+	for _, dep := range p.deps {
+		pi := ms.index[dep]
 		ms.childrenOf[pi] = append(ms.childrenOf[pi], i)
 	}
 	return nil
 }
 
 func (ms *MemStore) Contains(id ID) bool {
-	_, ok := ms.index[hex.EncodeToString(id)]
+	_, ok := ms.index[id]
 	return ok
 }
 
 type Stash struct {
 	log   []*Record
-	index map[string]int
+	index map[ID]int
 }
 
 func NewStash() *Stash {
 	return &Stash{
 		log:   []*Record{},
-		index: make(map[string]int),
+		index: make(map[ID]int),
 	}
 }
 
 func (s *Stash) Add(p *Record) {
-	id := hex.EncodeToString(p.id)
-	if _, found := s.index[id]; found {
+	if _, found := s.index[p.id]; found {
 		return
 	}
 	i := len(s.log)
 	s.log = append(s.log, p)
-	s.index[id] = i
+	s.index[p.id] = i
 }
 
 func (s *Stash) Contains(id ID) bool {
-	_, ok := s.index[hex.EncodeToString(id)]
+	_, ok := s.index[id]
 	return ok
 }
 
@@ -211,6 +203,6 @@ func (s *Stash) UnStash() []*Record {
 		res[i], res[j] = res[j], res[i]
 	}
 	s.log = []*Record{}
-	s.index = make(map[string]int)
+	s.index = make(map[ID]int)
 	return res
 }

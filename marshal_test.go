@@ -34,13 +34,13 @@ func TestRecordsReadWrite(t *testing.T) {
 	}
 
 	// since id is inferred from content, if content differs, then id differs as well
-	if !bytes.Equal(rs[0].id, a.id) {
+	if rs[0].id != a.id {
 		t.Fatalf("deserialized content is different from the original at index 0")
 	}
-	if !bytes.Equal(rs[1].id, b.id) {
+	if rs[1].id != b.id {
 		t.Fatalf("deserialized content is different from the original at index 1")
 	}
-	if !bytes.Equal(rs[2].id, c.id) {
+	if rs[2].id != c.id {
 		t.Fatalf("deserialized content is different from the original at index 2")
 	}
 }

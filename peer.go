@@ -2,7 +2,6 @@ package bec
 
 import (
 	"crypto/ed25519"
-	"encoding/hex"
 )
 
 const (
@@ -11,12 +10,12 @@ const (
 )
 
 type Peer struct {
-	pub         ed25519.PublicKey   // Peer's public key, equals to Author
-	priv        ed25519.PrivateKey  // Peer's private key, used for verification
-	heads       []ID                // the "youngest" (logically) records. All newly created records on this peer will refer to heads as their deps.
-	store       *MemStore           // Store where records are stored
-	stash       *Stash              // Stash used as a temporary container for records which are being resolved
-	missingDeps map[string]struct{} // "known" missing deps preventing records from stash to be integrated into store
+	pub         ed25519.PublicKey  // Peer's public key, equals to Author
+	priv        ed25519.PrivateKey // Peer's private key, used for verification
+	heads       []ID               // the "youngest" (logically) records. All newly created records on this peer will refer to heads as their deps.
+	store       *MemStore          // Store where records are stored
+	stash       *Stash             // Stash used as a temporary container for records which are being resolved
+	missingDeps map[ID]struct{}    // "known" missing deps preventing records from stash to be integrated into store
 }
 
 // NewPeer returns a peer instance representing current peer.
@@ -26,13 +25,13 @@ func NewPeer(pub ed25519.PublicKey, priv ed25519.PrivateKey, store *MemStore) *P
 		priv:        priv,
 		heads:       store.Heads(),
 		store:       store,
-		missingDeps: make(map[string]struct{}),
+		missingDeps: make(map[ID]struct{}),
 		stash:       NewStash(),
 	}
 }
 
 func (p *Peer) Author() AuthorId {
-	return p.pub
+	return NewAuthorId(p.pub)
 }
 
 func (p *Peer) Heads() []ID {
@@ -75,14 +74,14 @@ func (p *Peer) Integrate(rs []*Record) error {
 
 		if len(missingDeps) > 0 {
 			p.stash.Add(r)
-			for _, d := range missingDeps {
-				p.missingDeps[hex.EncodeToString(d)] = struct{}{}
+			for _, dep := range missingDeps {
+				p.missingDeps[dep] = struct{}{}
 			}
 		} else {
 			if err := p.store.Commit(r); err != nil {
 				return err
 			}
-			delete(p.missingDeps, hex.EncodeToString(r.id))
+			delete(p.missingDeps, r.id)
 			changed = true
 		}
 	}
@@ -101,8 +100,7 @@ func (p *Peer) Integrate(rs []*Record) error {
 func (p *Peer) MissingDeps() []ID {
 	var res []ID
 	for dep := range p.missingDeps {
-		pid, _ := hex.DecodeString(dep)
-		res = append(res, pid)
+		res = append(res, dep)
 	}
 	return res
 }

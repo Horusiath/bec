@@ -11,7 +11,7 @@ func (r *Record) Write(w io.Writer) error {
 	var inlined [5]byte // inline buffer for variable length integers
 	buf := inlined[:]
 
-	n, err := w.Write(r.author)
+	n, err := w.Write(r.author[:])
 	if err != nil {
 		return err
 	}
@@ -42,8 +42,8 @@ func ReadRecord(r *bufio.Reader) (*Record, error) {
 	if err != nil || n != ed25519.PublicKeySize {
 		return nil, err
 	}
-	var author []byte
-	author = append(author, buf[:ed25519.PublicKeySize]...)
+	var author AuthorId
+	copy(author[:], buf[:ed25519.PublicKeySize])
 	n, err = r.Read(buf[:ed25519.SignatureSize])
 	if err != nil || n != ed25519.SignatureSize {
 		return nil, err
@@ -64,7 +64,6 @@ func ReadRecord(r *bufio.Reader) (*Record, error) {
 		return nil, err
 	}
 	p := &Record{
-		id:     nil,
 		author: author,
 		sign:   sig,
 		deps:   deps,
@@ -121,7 +120,7 @@ func WriteIDs(ids []ID, w io.Writer) error {
 		return err
 	}
 	for _, d := range ids {
-		n, err = w.Write(d)
+		n, err = w.Write(d[:])
 		if err != nil {
 			return err
 		}
@@ -143,7 +142,7 @@ func ReadIDs(r *bufio.Reader) ([]ID, error) {
 		if err != nil || read != ed25519.PublicKeySize {
 			return nil, err
 		}
-		res[i] = append(ID{}, buf[:ed25519.PublicKeySize]...)
+		copy(res[i][:], buf[:ed25519.PublicKeySize])
 	}
 
 	return res, nil

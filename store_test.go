@@ -129,7 +129,7 @@ func TestMemStorePredecessors(t *testing.T) {
 	for i, a := range missing {
 		b := expect[i]
 		if a != b {
-			t.Fatalf("expected %s, found %s", hex.EncodeToString(b.id), hex.EncodeToString(a.id))
+			t.Fatalf("expected %s, found %s", hex.EncodeToString(b.id[:]), hex.EncodeToString(a.id[:]))
 		}
 	}
 }
@@ -158,7 +158,7 @@ func TestMemStorePredecessorsMultiHeads(t *testing.T) {
 	for i, a := range missing {
 		b := expect[i]
 		if a != b {
-			t.Fatalf("expected %s, found %s", hex.EncodeToString(b.id), hex.EncodeToString(a.id))
+			t.Fatalf("expected %s, found %s", hex.EncodeToString(b.id[:]), hex.EncodeToString(a.id[:]))
 		}
 	}
 }
@@ -184,7 +184,7 @@ func TestMemStoreMissing(t *testing.T) {
 	for i, a := range missing {
 		b := expect[i]
 		if a != b {
-			t.Fatalf("expected %s, found %s", hex.EncodeToString(b.id), hex.EncodeToString(a.id))
+			t.Fatalf("expected %s, found %s", hex.EncodeToString(b.id[:]), hex.EncodeToString(a.id[:]))
 		}
 	}
 }
@@ -211,7 +211,7 @@ func TestMemStoreMissingMultiHeads(t *testing.T) {
 	for i, a := range missing {
 		b := expect[i]
 		if a != b {
-			t.Fatalf("expected %s, found %s", hex.EncodeToString(b.id), hex.EncodeToString(a.id))
+			t.Fatalf("expected %s, found %s", hex.EncodeToString(b.id[:]), hex.EncodeToString(a.id[:]))
 		}
 	}
 }

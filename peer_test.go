@@ -50,11 +50,11 @@ func testReconcile(t *testing.T, reconcile func(src *Peer, dst *Peer) error) {
 }
 
 func compareStores(s1 *MemStore, s2 *MemStore, t *testing.T) {
-	k1 := make(map[string]struct{})
+	k1 := make(map[ID]struct{})
 	for k := range s1.index {
 		k1[k] = struct{}{}
 	}
-	k2 := make(map[string]struct{})
+	k2 := make(map[ID]struct{})
 	for k := range s2.index {
 		k2[k] = struct{}{}
 	}

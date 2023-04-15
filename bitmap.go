@@ -55,11 +55,11 @@ func (b Bitmap) Equals(o Bitmap) bool {
 }
 
 func (b Bitmap) AddBloom(id ID, hashes int) {
-	c := append(id, 0)
+	buf := append(id[:], 0)
 	l := b.Len()
 	for i := 0; i < hashes; i++ {
-		h := crc32.ChecksumIEEE(c) & math.MaxInt32
+		h := crc32.ChecksumIEEE(buf) & math.MaxInt32
 		b.Set(int(h)%l, true)
-		c[l] = byte(i)
+		buf[l] = byte(i)
 	}
 }
